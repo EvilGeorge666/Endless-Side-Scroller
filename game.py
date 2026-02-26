@@ -19,6 +19,8 @@ BULLET_COOLDOWN_MS = 170
 ENEMY_SPAWN_MS = 800
 ENEMY_MIN_SPEED = 180
 ENEMY_MAX_SPEED = 280
+STARTING_HEALTH = 3
+GAME_OVER_DISPLAY_MS = 1400
 
 SKY = "#ffcf7b"
 SAND = "#e6b554"
@@ -104,6 +106,7 @@ class Game:
 
         self.enemies = []
         self.score = 0
+        self.health = STARTING_HEALTH
 
         self.last_shot_time = 0
         self.shot_flash_ms = 0
@@ -111,6 +114,7 @@ class Game:
 
         self.mouse_pos = (WIDTH // 2, HEIGHT // 2)
         self.running = True
+        self.game_over_until = 0
         self.last_frame_time = time.perf_counter()
 
         self.canvas.bind("<Motion>", self.on_mouse_move)
@@ -126,6 +130,9 @@ class Game:
         self.mouse_pos = (event.x, event.y)
 
     def on_click(self, _event):
+        if self.is_game_over_active():
+            return
+
         now = self.now_ms()
         if now - self.last_shot_time < BULLET_COOLDOWN_MS:
             return
@@ -161,6 +168,11 @@ class Game:
         return False
 
     def update(self, dt):
+        if self.is_game_over_active():
+            if self.now_ms() >= self.game_over_until:
+                self.restart_round()
+            return
+
         now = self.now_ms()
         if now - self.last_spawn_time >= ENEMY_SPAWN_MS:
             self.enemies.append(Enemy.spawn())
@@ -169,6 +181,13 @@ class Game:
         survivors = []
         for enemy in self.enemies:
             enemy.x -= enemy.speed * dt
+            if self.enemy_touches_player(enemy):
+                self.health -= 1
+                if self.health <= 0:
+                    self.trigger_game_over(now)
+                    break
+                continue
+
             if enemy.x + enemy.width >= -40:
                 survivors.append(enemy)
         self.enemies = survivors
@@ -201,7 +220,17 @@ class Game:
             c.create_line(muzzle[0], muzzle[1], flash_end[0], flash_end[1], fill=BULLET_COLOR, width=3)
 
         c.create_text(18, 16, anchor="nw", fill=TEXT_COLOR, font=("Arial", 22, "bold"), text=f"Score: {self.score}")
-        c.create_text(18, 48, anchor="nw", fill=TEXT_COLOR, font=("Arial", 18), text="Mouse to aim • Left click to shoot")
+        c.create_text(18, 46, anchor="nw", fill=TEXT_COLOR, font=("Arial", 18, "bold"), text=f"Health: {self.health}")
+        c.create_text(18, 74, anchor="nw", fill=TEXT_COLOR, font=("Arial", 18), text="Mouse to aim • Left click to shoot")
+
+        if self.is_game_over_active():
+            c.create_text(
+                WIDTH / 2,
+                HEIGHT / 2,
+                fill="#3d120c",
+                font=("Arial", 54, "bold"),
+                text="GAME OVER",
+            )
 
     def draw_player(self):
         c = self.canvas
@@ -221,6 +250,42 @@ class Game:
         muzzle = v_add(shoulder, v_mul(aim, 48))
         c.create_line(shoulder[0], shoulder[1], muzzle[0], muzzle[1], fill="#221612", width=6)
         return shoulder, muzzle
+
+    def enemy_touches_player(self, enemy):
+        player_left, player_top, player_right, player_bottom = self.player_hitbox()
+        enemy_left = enemy.x
+        enemy_top = enemy.y
+        enemy_right = enemy.x + enemy.width
+        enemy_bottom = enemy.y + enemy.height
+
+        return not (
+            enemy_right < player_left
+            or enemy_left > player_right
+            or enemy_bottom < player_top
+            or enemy_top > player_bottom
+        )
+
+    def player_hitbox(self):
+        left = PLAYER_X - 50
+        top = GROUND_Y - HORSE_HEIGHT - COWBOY_HEIGHT + 16
+        right = left + HORSE_WIDTH
+        bottom = GROUND_Y
+        return left, top, right, bottom
+
+    def trigger_game_over(self, now_ms):
+        self.health = 0
+        self.enemies = []
+        self.game_over_until = now_ms + GAME_OVER_DISPLAY_MS
+
+    def restart_round(self):
+        self.score = 0
+        self.health = STARTING_HEALTH
+        self.enemies = []
+        self.last_spawn_time = self.now_ms()
+        self.game_over_until = 0
+
+    def is_game_over_active(self):
+        return self.game_over_until > 0
 
     def game_loop(self):
         if not self.running:
