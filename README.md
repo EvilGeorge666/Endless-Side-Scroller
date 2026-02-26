@@ -1,6 +1,6 @@
 # Endless-Side-Scroller
 
-A Python + Pygame endless 2D side-scroller where you control a cowboy riding a horse through the desert.
+A Python endless 2D side-scroller where you control a cowboy riding a horse through the desert.
 
 ## Gameplay
 - Enemies emerge from the **right side** of the screen and move left.
@@ -20,3 +20,8 @@ python game.py
 ## Controls
 - **Mouse move**: Aim
 - **Left mouse button**: Shoot
+- **Esc** or window close button: Quit
+
+## Tech notes
+- The game now uses Python's built-in **Tkinter** for rendering and input.
+- No third-party packages (including pygame) are required.
